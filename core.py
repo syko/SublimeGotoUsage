@@ -1,0 +1,278 @@
+import os
+import re
+import codecs
+import sublime
+from . import utils
+from .dep_graph import DepGraph
+
+graph = DepGraph()
+
+CLASS_REGEX = r'class ([^\s()\[\]{},+*/%!;:\'\"=<>-]+)'
+IMPORT_KEYWORDS = [
+    'import',
+    'include',
+    'require'
+]
+# FUNCTION_REGEX = r'function|def|
+IGNORED_PREFIX = [
+    'import',
+    'include',
+    'require',
+    'function',
+    'def',
+    'class'
+]
+IGNORED_SUFFIX = [
+    ':',
+    '='
+]
+LOADING_FRAMES = [
+    '=    ',
+    ' =   ',
+    '  =  ',
+    '   = ',
+    '    =',
+    '   = ',
+    '  =  ',
+    ' =   ',
+]
+
+def find_class_name(view):
+    """
+    Find a matching class definition either on the current line or
+    the first one going upwards from the current cursor position.
+    """
+    (current_region, current_line) = utils.get_current_line(view)
+
+    matches = re.match(CLASS_REGEX, current_line)
+    if matches:
+        return matches.group(1)
+
+    regions = view.find_all(CLASS_REGEX)
+    if not regions: return None
+
+
+    # Find the first match going backwards from current position
+    for region in reversed(regions):
+      if region.b < current_region.a: return view.substr(region)[6:].strip()
+
+
+    # Cursor is before any class definitions... return the first one
+    return view.substr(regions[0])[6:].strip()
+
+def find_function_name(view):
+    pass
+
+def is_actual_usage(line, subject):
+    line_split = line.split(subject, 1)
+
+    if line_split[0]:
+        # Test for word-break
+        if re.match(r'[^\s()\[\]{},+*/%!;:\'\"=<>-]', line_split[0][-1]):
+            return False
+        # Test for definitions
+        before = line_split[0].rstrip(' \t')
+        for ignored_ending in IGNORED_PREFIX:
+            if before.endswith(ignored_ending):
+                return False
+
+    if line_split[1]:
+        # Test for word-break
+        if re.match(r'[^\s()\[\]{},+*/%!;:\'\"=<>-]', line_split[1][0]):
+            return False
+        # Test for definitions
+        after = line_split[1].lstrip(' \t')
+        for ignored_beginning in IGNORED_SUFFIX:
+            if after.startswith(ignored_beginning):
+                return False
+
+    subject_pos = line.find(subject)
+    strings = utils.find_strings(line)
+    for range in strings:
+        if range[0] < subject_pos and range[1] > subject_pos:
+            return False
+
+    return True
+
+def goto_usage_in_file(file_path, subject):
+    usage_region = None
+    point = 0
+    with codecs.open(file_path, 'r', 'utf8') as f:
+        for line in f:
+            if subject not in line:
+                point += len(line)
+                continue
+            if not is_actual_usage(line, subject):
+                point += len(line)
+                continue
+            a = line.find(subject)
+            usage_region = sublime.Region(point + a, point + a + len(subject))
+            break
+
+    if usage_region:
+        return {
+            'name': os.path.basename(file_path),
+            'path': file_path,
+            'region': usage_region
+        }
+
+    return None
+
+def find_imports_in_file(f):
+    """
+    Uses some broad keywords and quotation-searching to find imports.
+    Only supports imports that ar between quotes and that are actual path strings.
+    """
+    deps = []
+    found_import = False
+    current_context = ['any']
+
+    for line in f:
+        line_stripped = line.strip()
+
+        if current_context[-1] != 'comment' \
+        and (len(line_stripped) and line_stripped[0] == '#' \
+        or len(line_stripped) > 1 and line_stripped[:2] == '//'):
+            continue # Single line comment, move on
+
+        if current_context[-1] not in ('import', 'comment') \
+        and True not in [i in line_stripped for i in IMPORT_KEYWORDS]:
+            continue # No import on this line, move on
+
+        if current_context[-1] != 'comment':
+            is_comment_start = line_stripped[:2] == '/*'
+            if is_comment_start:
+                current_context.append('comment')
+                continue
+
+        if current_context[-1] == 'comment':
+            is_comment_end = line_stripped[:2] == '*/'
+            if is_comment_end:
+                current_context.pop()
+                continue
+
+        if current_context[-1] == 'comment': continue
+
+        if current_context[-1] != 'import':
+            # Look for keyword
+            for keyword in IMPORT_KEYWORDS:
+                matches = re.search(r'(?<![^\s])(%s)\b' % keyword, line_stripped)
+                if matches:
+                    current_context.append('import')
+                    line_stripped = line_stripped[matches.end(1):]
+                    break
+
+        if current_context[-1] == 'import':
+            # Look for the next string
+            matches = re.search(r'[\'\"]([^\'\"]+)[\'\"]', line_stripped)
+            if matches:
+                deps.append(matches.group(1))
+                current_context.pop()
+                continue
+
+    return deps
+
+def goto_usage_in_files(subject, files):
+    """
+    Smart approach: reads files from a list and parses them.
+    """
+
+    usage_list = []
+
+    for file_path in files:
+        try:
+            usage = goto_usage_in_file(file_path, subject)
+            if usage:
+                usage_list.append(usage)
+        except UnicodeDecodeError:
+            print("GotoUsage: Failed to open file", file_name)
+
+    return usage_list
+
+def goto_usage_in_folders(subject, folders):
+    """
+    Naive approach: reads all files and parses them.
+    """
+
+    usage_list = []
+
+    for folder in folders:
+        for root, dirs, files in os.walk(folder, True):
+            files = [f for f in files if f[0] != '.' and utils.file_filter(f)]
+            dirs[:] = [d for d in dirs if d[0] != '.' and utils.folder_filter(d)]
+            for file_name in files:
+                file_path = os.path.join(root, file_name)
+                try:
+                    usage = goto_usage_in_file(file_path, subject)
+                    if usage:
+                        usage_list.append(usage)
+                except UnicodeDecodeError:
+                    print("GotoUsage: Failed to open file", file_name)
+
+    return usage_list
+
+def get_dependencies_in_file(file_path):
+    try:
+        with codecs.open(file_path, 'r', 'utf8') as f:
+            deps = find_imports_in_file(f)
+            utils.expand_aliases(deps)
+            dir_path = os.path.dirname(file_path)
+            utils.join_dep_paths(dir_path, deps)
+            deps = list(set(utils.resolve_dep_paths(deps, utils.file_filter)))
+            if file_path in deps: del deps[deps.index(file_path)]
+            return deps
+    except UnicodeDecodeError:
+        print("GotoUsage: Failed to open file", file_path)
+
+def build_graph(folders, **kwargs):
+    """Build a whole new dependency graph"""
+    global graph
+    import random
+    graph.clear()
+    for folder in folders:
+        for root, dirs, files in os.walk(folder, True):
+            files = [f for f in files if f[0] != '.' and utils.file_filter(f)]
+            dirs[:] = [d for d in dirs if d[0] != '.' and utils.folder_filter(d)]
+            for file_name in files:
+                file_path = os.path.join(root, file_name)
+                if kwargs.get('on_progress', None): kwargs.get('on_progress')(num_deps)
+                deps = get_dependencies_in_file(file_path)
+                graph.add(file_path, deps)
+
+    if kwargs.get('on_complete'): kwargs.get('on_complete')()
+
+def refresh_dependencies(file_path):
+    """
+    Refresh the dependencies of a single file in the graph and save the graph
+    to the cache if the deps have changed.
+    """
+    global graph
+    direct_deps = get_dependencies_in_file(file_path)
+    current_deps = graph.get_dependees(file_path)
+    graph.set(file_path, direct_deps)
+    if graph.get_dependees(file_path) != current_deps:
+        utils.save_graph(graph)
+
+def load_graph():
+    global graph
+    utils.load_graph(graph)
+    if graph.num_deps == 0:
+        sublime.run_command('goto_usage_build_graph')
+
+open_callbacks = []
+
+def open_usage(view, usage, is_transient = False):
+    view = view.window().open_file(usage['path'], is_transient and sublime.TRANSIENT or 0)
+    if view.is_loading():
+        open_callbacks.append({
+            'view': view,
+            'callback': lambda view, cb: show_usage(view, usage)
+        })
+    else:
+        show_usage(view, usage)
+
+def show_usage(view, usage):
+    sel = view.sel()
+    sel.clear()
+    sel.add(usage['region'])
+    sublime.set_timeout(lambda: view.show(usage['region']), 100)

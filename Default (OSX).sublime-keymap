@@ -1,0 +1,3 @@
+[
+    { "keys": ["super+alt+o"], "command": "goto_usage"}
+]

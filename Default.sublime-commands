@@ -1,0 +1,4 @@
+[
+    { "caption": "Goto Usage", "command": "goto_usage", "args" : {} },
+    { "caption": "Goto Usage: Rebuild dependency graph", "command": "goto_usage_build_graph", "args" : {} }
+]
