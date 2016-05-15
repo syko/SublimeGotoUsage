@@ -70,7 +70,10 @@ def get_project_name():
 def get_setting(name, default = None):
     settings = sublime.load_settings('GotoUsage.sublime-settings')
     project_settings = settings.get(get_project_name(), {})
-    return project_settings.get(name, default)
+    if project_settings:
+        return project_settings.get(name, default)
+    else:
+        return settings.get(name, default)
 
 def file_filter(file_name):
     """Return True if the file passes the filter."""
