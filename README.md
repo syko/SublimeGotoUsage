@@ -47,6 +47,8 @@ Example configuration:
 
 ```json
 {
+  "file_extensions": [".js", ".coffee", ".jsx"],
+  "excluded_folders": ["node_modules", "dist"],
   "my_project": {
     "alias": {
       "components": "/fullpath/components/",
@@ -59,8 +61,8 @@ Example configuration:
 }
 ```
 
-All configuration is project-based. The name of the project to use in the configuration is the name of your project file
-without the `.sublime-project` extension.
+You can have default settings as well as project-based settings by scoping the setting with the name of the project.
+The name of the project to use in the configuration is the name of your project file without the `.sublime-project` extension.
 
 Configuration options:
 - `disable_dep_graph`: Disable the dependency graph and switch to naive mode instead.
@@ -72,9 +74,9 @@ Configuration options:
 
 The dependency graph tries to remove false negatives as much as possible so:
 - Paths that point to a directory are expanded to all files within the given directory. So
-  `require 'my/path' adds all files under directory `path` as dependencies.
+  `require 'my/path'` adds all files under directory `path` as dependencies.
 - Paths that point to a file but lack the extension are expanded to files that start with the same basename.
-  So `require `my/component` expands to something like `my/component.js`
+  So `require 'my/component'` expands to something like `my/component.js`
 
 
 ## Contributing
