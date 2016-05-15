@@ -2,7 +2,7 @@
 
 The opposite of Goto Definition.
 
-With the cursor in a class defintion, invoke Goto Usage and get a list of all the places where the class is used.
+With the cursor in a class definition, invoke Goto Usage and get a list of all the places where the class is used.
 You can easily browse through the list and jump to the specific use case.
 
 Default keyboard mapping: `cmd+alt+o` / `ctrl+alt+o`
