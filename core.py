@@ -1,11 +1,12 @@
 import os
 import re
+import time
 import codecs
 import sublime
 from . import utils
 from .dep_graph import DepGraph
 
-graph = DepGraph()
+graphs = {}
 
 CLASS_REGEX = {
     'regex': r'class ([^\s\(\)\[\]\{\}+*/&\|=<>,:;~-]+)',
@@ -252,11 +253,9 @@ def get_dependencies_in_file(file_path):
     except UnicodeDecodeError:
         utils.log("Failed to open file", file_path, warning=True)
 
-def build_graph(folders, **kwargs):
+def build_graph(graph_to_build, folders, **kwargs):
     """Build a whole new dependency graph"""
-    global graph
     import random
-    graph.clear()
     for folder in folders:
         for root, dirs, files in os.walk(folder, True):
             files = [f for f in files if f[0] != '.' and utils.file_filter(f)]
@@ -265,31 +264,52 @@ def build_graph(folders, **kwargs):
                 file_path = os.path.join(root, file_name)
                 if kwargs.get('on_progress', None): kwargs.get('on_progress')(num_deps)
                 deps = get_dependencies_in_file(file_path)
-                graph.add(file_path, deps)
+                graph_to_build.add(file_path, deps)
 
     if kwargs.get('on_complete'): kwargs.get('on_complete')()
 
-def refresh_dependencies(file_path):
+def refresh_dependencies(file_path, project_name):
     """
     Refresh the dependencies of a single file in the graph and save the graph
     to the cache if the deps have changed.
     """
-    global graph
+    global graphs
+    graph = graphs.get(project_name)
+
+    if not graph:
+        utils.log('Cannot refresh dependencies for file "%s", graph for project "%s" does not exist: rebuilding' % (file_path, project_name))
+        sublime.active_window().run_command('goto_usage_build_graph', {'project_name': project_name})
+        return
+
     direct_deps = get_dependencies_in_file(file_path)
     current_deps = graph.get_dependees(file_path)
     graph.set(file_path, direct_deps)
+
+    # Update cache if graph changed
     if graph.get_dependees(file_path) != current_deps:
         utils.save_graph(graph)
 
-def load_graph():
-    global graph
-    utils.log("Loading graph from cache")
-    utils.load_graph(graph)
-    if graph.num_deps == 0:
+def load_graph(project_name):
+    global graphs
+    utils.log("Loading graph from cache for project %s" % project_name)
+    graph = utils.load_graph(project_name)
+    if not graph or graph.num_deps == 0:
         utils.log("No graph in cache: rebuilding")
-        sublime.run_command('goto_usage_build_graph')
+        sublime.active_window().run_command('goto_usage_build_graph', {'project_name': project_name})
     else:
         utils.log("Got %d dependencies from cache" % graph.num_deps)
+
+def ensure_graph_exists(project_name):
+    global graphs
+    print('ensuring')
+    graph = graphs.get(project_name)
+    if not graph or graph['last_update'] < time.time() - 1000 * 60 * 60 * 24:
+        print('no graph, making')
+        load_graph(project_name)
+
+def load_all_graphs():
+    project_names = utils.get_all_project_names()
+    for project_name in project_names: load_graph(project_name)
 
 open_callbacks = []
 

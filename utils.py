@@ -2,6 +2,7 @@ import os
 import re
 import sublime
 import json
+from .dep_graph import DepGraph
 
 STRING_DELIMITERS = ['"', "'", '`']
 
@@ -63,13 +64,30 @@ def find_strings(input):
 
     return sorted(string_ranges)
 
-def get_project_name():
+
+def get_project_name(view_or_window):
+    try:
+        window = view_or_window.window()
+    except AttributeError:
+        window = view_or_window
+    vars = window.extract_variables()
+    return vars.get('project_base_name')
+
+def get_active_project_name():
+    "Return the currently active project name"
     vars = sublime.active_window().extract_variables()
-    return vars['project_base_name']
+    return vars.get('project_base_name')
+
+def get_all_project_names():
+    "Return a list of all open project names"
+    windows = sublime.windows()
+    varses = [w.extract_variables() for w in windows]
+    project_names = [v.get('project_base_name') for v in varses]
+    return project_names
 
 def get_setting(name, default = None):
     settings = sublime.load_settings('GotoUsage.sublime-settings')
-    project_settings = settings.get(get_project_name(), {})
+    project_settings = settings.get(get_active_project_name(), {})
     if project_settings:
         return project_settings.get(name, default)
     else:
@@ -123,23 +141,25 @@ def get_files_in_dir(path, recursive = True):
         log("File Not Found: %s Did you forget to add an alias?" % e.filename, warning=True)
     return file_list
 
-def get_dep_cache_path():
-    return os.path.join(sublime.cache_path(), 'GotoUsage-cache-%s.json' % get_project_name())
+def get_dep_cache_path(project_name):
+    return os.path.join(sublime.cache_path(), 'GotoUsage-cache-%s.json' % project_name)
 
-def load_graph(graph):
+def load_graph(project_name):
     """Load graph from cache to `graph`"""
-    path = get_dep_cache_path()
+    path = get_dep_cache_path(project_name)
     try:
         f = open(path, 'r')
         data = json.loads(f.read())
         f.close()
+        graph = DepGraph()
         graph.set_data(data)
+        return graph
     except IOError:
-        pass
+        return None
 
-def save_graph(graph):
+def save_graph(graph, project_name):
     """Save current graph to cache"""
-    path = get_dep_cache_path()
+    path = get_dep_cache_path(project_name)
     try:
         f = open(path, 'w')
         f.write(json.dumps(graph.get_data(), separators=(',',':')))

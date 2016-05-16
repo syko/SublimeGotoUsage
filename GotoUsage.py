@@ -4,6 +4,7 @@ import time
 import sublime, sublime_plugin
 from . import utils
 from . import core
+from .dep_graph import DepGraph
 
 class RetValThread(threading.Thread):
     """
@@ -62,61 +63,72 @@ class GotoUsageCommand(sublime_plugin.TextCommand):
                 on_complete=on_complete
             ).start()
         else:
+            graph = core.graphs.get(utils.get_project_name(window), {}).get('graph')
+            if not graph:
+                log('Dependency graph for current project not found: building')
+                core.load_graph(utils.get_project_name(window))
+                return
             current_file = self.view.file_name()
             RetValThread(
                 target=core.goto_usage_in_files,
-                args=[subject, core.graph.get_dependants(current_file) + [current_file]],
+                args=[subject, graph.get_dependants(current_file) + [current_file]],
                 on_complete=on_complete
             ).start()
 
-building_graph = False
+building_graphs = []
 
-class GotoUsageBuildGraphCommand(sublime_plugin.TextCommand):
+class GotoUsageBuildGraphCommand(sublime_plugin.WindowCommand):
 
-    def run(self, edit):
-        global building_graph
+    def run(self, project_name = None):
+        global building_graphs
 
-        if building_graph: return
+        if project_name in building_graphs: return
 
-        core.graph.clear()
+        graph = DepGraph()
 
-        window = sublime.active_window()
-        project_folders = window.folders()
-        self.view.erase_status('GotoUsage')
+        project_folders = self.window.folders()
+        project_name = project_name or utils.get_active_project_name()
+        self.window.active_view().erase_status('GotoUsage')
 
-        building_graph = True
+        building_graphs.append(project_name)
         self.loading_frame = 0
         self.loading_start = time.time()
 
         def erase_status():
-            self.view.erase_status('GotoUsage')
+            self.window.active_view().erase_status('GotoUsage')
 
         def show_progress():
-            global building_graph
-            if not building_graph: return
-            self.view.set_status('GotoUsage', '[%s] GotoUsage: %d dependencies' % (core.LOADING_FRAMES[self.loading_frame], core.graph.num_deps))
+            global building_graphs
+            if project_name not in building_graphs: return
+            self.window.active_view().set_status('GotoUsage', '[%s] GotoUsage: %d dependencies' % (core.LOADING_FRAMES[self.loading_frame], graph.num_deps))
             self.loading_frame = (self.loading_frame + 1) % len(core.LOADING_FRAMES)
             if time.time() - self.loading_start > 60: # Taking too much time, bail
                 erase_status()
-                building_graph = False
+                del building_graphs[building_graphs.index(project_name)]
             else:
                 sublime.set_timeout(show_progress, 100)
 
         def on_complete():
-            global building_graph
-            building_graph = False
-            self.view.set_status('GotoUsage', 'GotoUsage complete: found %d dependencies' % core.graph.num_deps)
+            global building_graphs
+            del building_graphs[building_graphs.index(project_name)]
+            core.graphs[project_name] = {
+                'last_update': time.time(),
+                'graph': graph
+            }
+            utils.save_graph(graph, project_name)
+            utils.log('Built graph with %d dependencies' %  graph.num_deps)
+            self.window.active_view().set_status('GotoUsage', 'GotoUsage complete: found %d dependencies' % graph.num_deps)
             sublime.set_timeout(erase_status, 4000)
 
         show_progress()
 
-        threading.Thread(target=core.build_graph, args=[project_folders], kwargs={
+        threading.Thread(target=core.build_graph, args=[graph, project_folders], kwargs={
             "on_complete": on_complete
         }).start()
 
 class FileOpenListener(sublime_plugin.EventListener):
-    """Runs file opening callbacks when a file has finished opening.
-
+    """
+    Runs file opening callbacks when a file has finished opening.
     Used to scroll the viewport to the usage and highlight it after the async open operation.
     """
     def on_load(self, view):
@@ -130,6 +142,9 @@ class FileSaveListener(sublime_plugin.EventListener):
     """Refresh the dependencies of a file upon saving."""
     def on_post_save_async(self, view):
         if utils.file_filter(view.file_name()):
-            core.refresh_dependencies(view.file_name())
+            core.refresh_dependencies(view.file_name(), utils.get_project_name(view))
 
-core.load_graph()
+class ViewChangeListener(sublime_plugin.EventListener):
+    def on_activated(self, view):
+        if not utils.get_setting('disable_dep_graph'):
+            core.ensure_graph_exists(utils.get_project_name(view))
