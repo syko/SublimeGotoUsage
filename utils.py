@@ -75,6 +75,12 @@ def get_setting(name, default = None):
     else:
         return settings.get(name, default)
 
+def log(*args, **kwargs):
+    error = kwargs.get('error', False)
+    warning = kwargs.get('warning', False)
+    if get_setting('verbose_logging') or error or warning:
+        print('GotoUsage%s:' % (error and ' Error' or warning and ' Warning' or ''), *args)
+
 def file_filter(file_name):
     """Return True if the file passes the filter."""
     extensions = get_setting('file_extensions')
@@ -114,7 +120,7 @@ def get_files_in_dir(path, recursive = True):
             for f in files:
                 file_list.append(os.path.join(root, f))
     except FileNotFoundError as e:
-        print("GotoUsage FileNotFoundError: %s Did you forget to add an alias?" % e.filename)
+        log("File Not Found: %s Did you forget to add an alias?" % e.filename, warning=True)
     return file_list
 
 def get_dep_cache_path():
@@ -139,7 +145,7 @@ def save_graph(graph):
         f.write(json.dumps(graph.get_data(), separators=(',',':')))
         f.close()
     except IOError as e:
-        print("GotoUsage failed to save dependency graph: %s" % e.message)
+        log("Failed to save dependency graph: %s" % e.message, error=True)
 
 isfile_cache = {}
 def isfile(path):

@@ -1,4 +1,4 @@
-# SublimeGotoUsage
+# Goto Usage
 
 The opposite of Goto Definition.
 

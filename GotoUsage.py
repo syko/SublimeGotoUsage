@@ -29,9 +29,7 @@ class GotoUsageCommand(sublime_plugin.TextCommand):
         # Find wrapping class definition
         # If no class found, find wrapping function definition
 
-        subject = core.find_class_name(self.view)
-        if not subject:
-            subject = core.find_function_name(self.view)
+        subject = core.find_subject_name(self.view)
 
         if not subject:
             sublime.status_message("Could not find class/function name to search for")

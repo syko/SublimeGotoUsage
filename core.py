@@ -7,13 +7,23 @@ from .dep_graph import DepGraph
 
 graph = DepGraph()
 
-CLASS_REGEX = r'class ([^\s()\[\]{},+*/%!;:\'\"=<>-]+)'
+CLASS_REGEX = {
+    'regex': r'class ([^\s\(\)\[\]\{\}+*/&\|=<>,:;~-]+)',
+    'group': [1]
+}
+FUNCTION_REGEX = {
+    'regex': r'(function\s+([^\s\(\)\[\]\{\}+*/&\|=<>,:;~-]+)+.+{$)|(def\s([^\s\(\)\[\]\{\}+*/&\|=<>,:;~-]+).+:$)',
+    'group': [2, 4]
+}
+VAR_REGEX = {
+    'regex': r'(var|let|const)\s+([^\s\(\)\[\]\{\}+*/&\|=<>,:;~-]+)\s*=',
+    'group': [2]
+}
 IMPORT_KEYWORDS = [
     'import',
     'include',
     'require'
 ]
-# FUNCTION_REGEX = r'function|def|
 IGNORED_PREFIX = [
     'import',
     'include',
@@ -37,31 +47,49 @@ LOADING_FRAMES = [
     ' =   ',
 ]
 
-def find_class_name(view):
+def get_item_name_on_line(line, regex):
+    matches = re.match(regex['regex'], line)
+    if not matches: return None
+    if matches:
+        return [matches.group(i) for i in regex['group'] if matches.group(i)][0]
+
+def find_subject_name_on_current_line(view, regex):
     """
-    Find a matching class definition either on the current line or
+    Find a matching regex-based definition either on the current line or
+    the first one going upwards from the current cursor position.
+    """
+    (current_region, current_line) = utils.get_current_line(view)
+    return get_item_name_on_line(current_line, regex)
+
+def find_subject_name_upwards(view, regex):
+    """
+    Find a matching regex-based definition either on the current line or
     the first one going upwards from the current cursor position.
     """
     (current_region, current_line) = utils.get_current_line(view)
 
-    matches = re.match(CLASS_REGEX, current_line)
-    if matches:
-        return matches.group(1)
-
-    regions = view.find_all(CLASS_REGEX)
+    regions = view.find_all(regex['regex'])
     if not regions: return None
-
 
     # Find the first match going backwards from current position
     for region in reversed(regions):
-      if region.b < current_region.a: return view.substr(region)[6:].strip()
-
+      if region.b < current_region.a:
+        return get_item_name_on_line(view.substr(region), regex)
 
     # Cursor is before any class definitions... return the first one
-    return view.substr(regions[0])[6:].strip()
+    return get_item_name(view.substr(regions[0]))
 
-def find_function_name(view):
-    pass
+def find_subject_name(view):
+    """
+    Find a matching class/fn/var definition either on the current line or
+    the first one going upwards from the current cursor position.
+    """
+    return (find_subject_name_on_current_line(view, CLASS_REGEX)
+        or find_subject_name_on_current_line(view, FUNCTION_REGEX)
+        or find_subject_name_on_current_line(view, VAR_REGEX)
+        or find_subject_name_upwards(view, CLASS_REGEX)
+        or find_subject_name_upwards(view, FUNCTION_REGEX)
+        or find_subject_name_upwards(view, VAR_REGEX))
 
 def is_actual_usage(line, subject):
     line_split = line.split(subject, 1)
@@ -185,7 +213,7 @@ def goto_usage_in_files(subject, files):
             if usage:
                 usage_list.append(usage)
         except UnicodeDecodeError:
-            print("GotoUsage: Failed to open file", file_name)
+            utils.log("Failed to open file", file_name, warning=True)
 
     return usage_list
 
@@ -207,7 +235,7 @@ def goto_usage_in_folders(subject, folders):
                     if usage:
                         usage_list.append(usage)
                 except UnicodeDecodeError:
-                    print("GotoUsage: Failed to open file", file_name)
+                    utils.log("Failed to open file", file_name, warning=True)
 
     return usage_list
 
@@ -222,7 +250,7 @@ def get_dependencies_in_file(file_path):
             if file_path in deps: del deps[deps.index(file_path)]
             return deps
     except UnicodeDecodeError:
-        print("GotoUsage: Failed to open file", file_path)
+        utils.log("Failed to open file", file_path, warning=True)
 
 def build_graph(folders, **kwargs):
     """Build a whole new dependency graph"""
@@ -255,9 +283,13 @@ def refresh_dependencies(file_path):
 
 def load_graph():
     global graph
+    utils.log("Loading graph from cache")
     utils.load_graph(graph)
     if graph.num_deps == 0:
+        utils.log("No graph in cache: rebuilding")
         sublime.run_command('goto_usage_build_graph')
+    else:
+        utils.log("Got %d dependencies from cache" % graph.num_deps)
 
 open_callbacks = []
 
