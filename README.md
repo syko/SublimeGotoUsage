@@ -70,6 +70,18 @@ Configuration options:
 - `file_extensions`: List of file extensions to consider. (default: `[".js", ".coffee", ".jsx"]`)
 - `excluded_folders`: List of folders to exclude. (default: `["node_modules", "dist", "build", "tmp", ".tmp"]`)
 
+If you juggle multiple projects and use Goto Usage in only some of them or the dependency graph is not supported in most of them
+it's a good idea to disable the dependency graph globally and only enable it for some projects:
+
+```json
+{
+  "disable_dep_graph": true
+  "my_project": {
+    "disable_dep_graph": false
+  }
+}
+```
+
 ## Notes on dependency graph
 
 The dependency graph tries to remove false negatives as much as possible so:
