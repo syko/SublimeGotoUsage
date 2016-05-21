@@ -29,6 +29,9 @@ IGNORED_PREFIX = [
     'include',
     'require',
     'function',
+    'const',
+    'var',
+    'let',
     'def',
     'class'
 ]
@@ -95,25 +98,26 @@ def is_actual_usage(line, subject):
     line_split = line.split(subject, 1)
 
     if line_split[0]:
-        # Test for word-break
+        # Test for word-break before subject
         if re.match(r'[^\s()\[\]{},+*/%!;:\'\"=<>-]', line_split[0][-1]):
             return False
         # Test for definitions
-        before = line_split[0].rstrip(' \t')
+        before = line_split[0].rstrip(' \t ([{}])')
         for ignored_ending in IGNORED_PREFIX:
             if before.endswith(ignored_ending):
                 return False
 
     if line_split[1]:
-        # Test for word-break
+        # Test for word-break after subject
         if re.match(r'[^\s()\[\]{},+*/%!;:\'\"=<>-]', line_split[1][0]):
             return False
         # Test for definitions
-        after = line_split[1].lstrip(' \t')
+        after = line_split[1].rstrip(' \t ([{}])')
         for ignored_beginning in IGNORED_SUFFIX:
             if after.startswith(ignored_beginning):
                 return False
 
+    # Test for subject located inside string
     subject_pos = line.find(subject)
     strings = utils.find_strings(line)
     for range in strings:
