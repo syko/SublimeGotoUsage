@@ -19,11 +19,27 @@ VAR_REGEX = {
     'regex': r'(var|let|const)\s+([^\s\(\)\[\]\{\}+*/&\|=<>,:;~-]+)\s*=',
     'group': [2]
 }
-IMPORT_KEYWORDS = [
-    'import',
-    'include',
-    'require'
-]
+
+SINGLE_LINE_COMMENT = ['#', '//']
+MULTI_LINE_COMMENT_START = ['/*']
+MULTI_LINE_COMMENT_END = ['/*']
+SINGLE_LINE_IMPORT_RE = r'\b(import|require|include)\b.+[\'\"][^\'\"]+[\'\"]$'
+MULTI_LINE_IMPORT_START_RE = r'\b(import|require|include)\b[\s()\[\]{}]*$'
+MULTI_LINE_IMPORT_END_RE = r'^[)}\]](\s*from.+)?$'
+
+C_ANY                 = 0b111111111
+C_CODE                = 0b000000001
+C_IMPORT              = 0b000011110
+C_SINGLE_IMPORT       = 0b000000010
+C_MULTI_IMPORT_START  = 0b000000100
+C_MULTI_IMPORT        = 0b000001000
+C_MULTI_IMPORT_END    = 0b000010000
+C_COMMENT             = 0b111100000
+C_SINGLE_COMMENT      = 0b000100000
+C_MULTI_COMMENT_START = 0b001000000
+C_MULTI_COMMENT       = 0b010000000
+C_MULTI_COMMENT_END   = 0b100000000
+
 IGNORED_PREFIX = [
     'import',
     'include',
@@ -135,82 +151,101 @@ def is_actual_usage(line, subject):
 
     return True
 
-def get_usages_in_file(file_path, subject):
-    usage_regions = []
-    point = 0
+def parse_lines(f, yield_context=C_ANY):
+    """
+    Generator for looping over lines in a file while ignoring comments.
+    Works like a state-machine emitting only the necessary states (contexts).
+    Continues to next line as early as possible for speeeed.
+    """
+    current_context = [C_CODE] # Default context when nothing else mathces
     line_nr = 0
-    with open(file_path, 'r', encoding='utf8') as f:
-        for line in f:
-            line_nr += 1
-            if subject not in line:
-                point += len(line)
-                continue
-            if not is_actual_usage(line, subject):
-                point += len(line)
-                continue
-            a = line.find(subject)
-            usage_regions.append({
-                'line_nr': line_nr,
-                'path': file_path,
-                'region': sublime.Region(point + a, point + a + len(subject))
-            })
-            point += len(line)
+    line_start = 0
+    for line_unstripped in f:
+        line = line_unstripped.strip('\t ;')
+        line_nr += 1
 
-    return usage_regions
+        # Handle single-line comments
+        if not current_context[-1] & C_MULTI_COMMENT:
+            is_single_line_comment = True in (line.startswith(c) for c in SINGLE_LINE_COMMENT)
+            if is_single_line_comment:
+                if yield_context & C_COMMENT: yield (line_start, line_nr, line)
+                line_start += len(line_unstripped)
+                continue
 
+        # Handle end of multi-line comment
+        if current_context[-1] & C_MULTI_COMMENT:
+            is_comment_end = True in (line.startswith(c) for c in MULTI_LINE_COMMENT_END)
+            if is_comment_end:
+                if yield_context & C_MULTI_COMMENT_END: yield (line_start, line_nr, line)
+                line_start += len(line_unstripped)
+                current_context.pop()
+                continue # Kinda assuming nothing comes after `*/` here
+
+        # Handle start of multi-line comment
+        if not current_context[-1] & C_MULTI_COMMENT:
+            is_comment_start = True in (line.startswith(c) for c in MULTI_LINE_COMMENT_START)
+            if is_comment_start:
+                current_context.append(C_MULTI_COMMENT)
+                if yield_context & C_MULTI_COMMENT_START: yield (line_start, line_nr, line)
+                line_start += len(line_unstripped)
+                continue
+
+        # Handle single-line import
+        if not current_context[-1] & C_MULTI_IMPORT:
+            is_single_line_import = re.search(SINGLE_LINE_IMPORT_RE, line)
+            if is_single_line_import:
+                if yield_context & C_SINGLE_IMPORT: yield (line_start, line_nr, line)
+                line_start += len(line_unstripped)
+                continue
+
+        # Handle end of import
+        if current_context[-1] & C_MULTI_IMPORT:
+            is_import_end = re.search(MULTI_LINE_IMPORT_END_RE, line)
+            if is_import_end:
+                if yield_context & C_MULTI_IMPORT_END: yield (line_start, line_nr, line)
+                current_context.pop()
+                line_start += len(line_unstripped)
+                continue
+
+        # Handle start of multi-line import
+        if not current_context[-1] & C_MULTI_IMPORT:
+            is_import_start = re.search(MULTI_LINE_IMPORT_START_RE, line)
+            if is_import_start:
+                current_context.append(C_MULTI_IMPORT)
+                if yield_context & C_MULTI_IMPORT_START: yield (line_start, line_nr, line)
+                line_start += len(line_unstripped)
+                continue
+
+        # No context switch detected: yield current context for current line
+
+        if yield_context & current_context[-1]:
+            yield (line_start, line_nr, line)
+            line_start += len(line_unstripped)
 def find_imports_in_file(f):
     """
     Uses some broad keywords and quotation-searching to find imports.
-    Only supports imports that ar between quotes and that are actual path strings.
+    Only supports imports that are between quotes and that are actual path strings.
     """
     deps = []
-    found_import = False
-    current_context = ['any']
-
-    for line in f:
-        line_stripped = line.strip()
-
-        if current_context[-1] != 'comment' \
-        and (len(line_stripped) and line_stripped[0] == '#' \
-        or len(line_stripped) > 1 and line_stripped[:2] == '//'):
-            continue # Single line comment, move on
-
-        if current_context[-1] not in ('import', 'comment') \
-        and True not in [i in line_stripped for i in IMPORT_KEYWORDS]:
-            continue # No import on this line, move on
-
-        if current_context[-1] != 'comment':
-            is_comment_start = line_stripped[:2] == '/*'
-            if is_comment_start:
-                current_context.append('comment')
-                continue
-
-        if current_context[-1] == 'comment':
-            is_comment_end = line_stripped[:2] == '*/'
-            if is_comment_end:
-                current_context.pop()
-                continue
-
-        if current_context[-1] == 'comment': continue
-
-        if current_context[-1] != 'import':
-            # Look for keyword
-            for keyword in IMPORT_KEYWORDS:
-                matches = re.search(r'(?<![^\s])(%s)\b' % keyword, line_stripped)
-                if matches:
-                    current_context.append('import')
-                    line_stripped = line_stripped[matches.end(1):]
-                    break
-
-        if current_context[-1] == 'import':
-            # Look for the next string
-            matches = re.search(r'[\'\"]([^\'\"]+)[\'\"]', line_stripped)
-            if matches:
-                deps.append(matches.group(1))
-                current_context.pop()
-                continue
-
+    for (line_start, line_nr, line) in parse_lines(f, C_SINGLE_IMPORT | C_MULTI_IMPORT_END):
+        paths = re.search(r'[\'\"]([^\'\"]+)[\'\"]', line)
+        if paths: deps.append(paths.group(1))
     return deps
+
+def get_usages_in_file(file_path, subject):
+    usage_regions = []
+    with open(file_path, 'r', encoding='utf8') as f:
+        for (line_start, line_nr, line) in parse_lines(f, C_CODE):
+            if subject not in line: continue
+            if not is_actual_usage(line, subject): continue
+            offset = line.find(subject)
+            usage_regions.append({
+                'line_nr': line_nr,
+                'path': file_path,
+                'region': sublime.Region(line_start + offset, line_start + offset + len(subject))
+            })
+
+    return usage_regions
 
 def get_usages_in_files(subject, files):
     """
@@ -263,7 +298,6 @@ def get_dependencies_in_file(file_path):
 
 def build_graph(g_to_build, folders, **kwargs):
     """Build a whole new dependency graph"""
-    import random
     for folder in folders:
         for root, dirs, files in os.walk(folder, True):
             files = [f for f in files if f[0] != '.' and utils.file_filter(f)]
