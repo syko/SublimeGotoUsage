@@ -38,7 +38,7 @@ class GotoUsageCommand(sublime_plugin.TextCommand):
 
         def on_complete(found_usage_list):
             if not len(found_usage_list):
-                sublime.status_message("Could not find class/function '%s'" % subject)
+                sublime.status_message("Could not find class/function/var '%s'" % subject)
                 return
 
             def on_item_selected(index):
@@ -58,7 +58,7 @@ class GotoUsageCommand(sublime_plugin.TextCommand):
 
         if utils.get_setting('disable_dep_graph', False):
             RetValThread(
-                target=core.goto_usage_in_folders,
+                target=core.get_usages_in_folders,
                 args=[subject, project_folders],
                 on_complete=on_complete
             ).start()
@@ -71,7 +71,7 @@ class GotoUsageCommand(sublime_plugin.TextCommand):
                 if not g: return
             current_file = self.view.file_name()
             RetValThread(
-                target=core.goto_usage_in_files,
+                target=core.get_usages_in_files,
                 args=[subject, g['graph'].get_dependants(current_file) + [current_file]],
                 on_complete=on_complete
             ).start()

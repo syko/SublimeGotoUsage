@@ -212,7 +212,7 @@ def find_imports_in_file(f):
 
     return deps
 
-def goto_usage_in_files(subject, files):
+def get_usages_in_files(subject, files):
     """
     Smart approach: reads files from a list and parses them.
     """
@@ -228,7 +228,7 @@ def goto_usage_in_files(subject, files):
 
     return usage_list
 
-def goto_usage_in_folders(subject, folders):
+def get_usages_in_folders(subject, folders):
     """
     Naive approach: reads all files and parses them.
     """
