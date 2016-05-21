@@ -255,8 +255,7 @@ def get_dependencies_in_file(file_path):
             deps = find_imports_in_file(f)
             utils.expand_aliases(deps)
             dir_path = os.path.dirname(file_path)
-            utils.join_dep_paths(dir_path, deps)
-            deps = list(set(utils.resolve_dep_paths(deps, utils.file_filter)))
+            deps = list(set(utils.resolve_dep_paths(deps, dir_path, utils.file_filter, utils.folder_filter)))
             if file_path in deps: del deps[deps.index(file_path)]
             return deps
     except UnicodeDecodeError:
@@ -268,7 +267,7 @@ def build_graph(g_to_build, folders, **kwargs):
     for folder in folders:
         for root, dirs, files in os.walk(folder, True):
             files = [f for f in files if f[0] != '.' and utils.file_filter(f)]
-            dirs[:] = [d for d in dirs if d[0] != '.' and utils.folder_filter(d)]
+            dirs[:] = [d for d in dirs if d[0] != '.' and utils.folder_filter(os.path.join(root, d))]
             for file_name in files:
                 file_path = os.path.join(root, file_name)
                 deps = get_dependencies_in_file(file_path)

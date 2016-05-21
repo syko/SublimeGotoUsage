@@ -50,9 +50,12 @@ Example configuration:
   "file_extensions": [".js", ".coffee", ".jsx"],
   "excluded_folders": ["node_modules", "dist"],
   "my_project": {
+    "root": [
+      "/fullpath/utils",
+      "/fullpath/someotherthing"
+    ],
     "alias": {
-      "components": "/fullpath/components/",
-      "utils": "/fullpath/utils/"
+      "components": "/fullpath/components/"
     },
     "file_extensions": [".js", ".coffee", ".jsx"],
     "excluded_folders": ["node_modules", "dist", "build", "tmp", ".tmp"],
@@ -66,9 +69,13 @@ The name of the project to use in the configuration is the name of your project 
 
 Configuration options:
 - `disable_dep_graph`: Disable the dependency graph and switch to naive mode instead.
-- `alias`: Add aliases that might occur within imports (so `require 'foo/bar.js'` translates to `require 'some/path/bar.js'`)
+- `root`: like a PATH variable: try to resolve imports within these directories if nothing is found as a 'relative' path
+  (so `require 'foo/bar.js'` translates to `require '/fullpath/utils/foo/bar.js'` if such a file exists)
+- `alias`: Add aliases that might occur within imports (so `require 'components/foo.js'` translates
+  to `require '/fullpath/components/foo.js'` if such a file exists)
 - `file_extensions`: List of file extensions to consider. (default: `[".js", ".coffee", ".jsx"]`)
-- `excluded_folders`: List of folders to exclude. (default: `["node_modules", "dist", "build", "tmp", ".tmp"]`)
+- `excluded_folders`: List of folders to exclude. These are not 'paths' but rather substrings that paths are matched against.
+  (default: `["node_modules/", "dist/", "build/", "tmp/", ".tmp/"]`)
 
 If you juggle multiple projects and use Goto Usage in only some of them or the dependency graph is not supported in most of them
 it's a good idea to disable the dependency graph globally and only enable it for some projects:

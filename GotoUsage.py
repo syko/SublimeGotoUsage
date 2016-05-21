@@ -69,10 +69,18 @@ class GotoUsageCommand(sublime_plugin.TextCommand):
                 # See if got it from cache
                 g = core.graphs.get(utils.get_project_name(window), {})
                 if not g: return
+
             current_file = self.view.file_name()
+            files = g['graph'].get_dependants(current_file)
+
+            # Append current file and make sure it's the last one
+            if current_file in files:
+                del files[files.index(current_file)]
+            files.append(current_file)
+
             RetValThread(
                 target=core.get_usages_in_files,
-                args=[subject, g['graph'].get_dependants(current_file) + [current_file]],
+                args=[subject, files],
                 on_complete=on_complete
             ).start()
 
@@ -122,7 +130,8 @@ class GotoUsageBuildGraphCommand(sublime_plugin.WindowCommand):
 
         def on_complete():
             global building_graphs
-            del building_graphs[building_graphs.index(project_name)]
+            if project_name in building_graphs:
+                del building_graphs[building_graphs.index(project_name)]
             core.graphs[project_name] = g
             utils.save_graph(g, project_name)
             utils.log('Built graph with %d dependencies' %  g['graph'].num_deps)

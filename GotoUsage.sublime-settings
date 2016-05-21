@@ -1,7 +1,8 @@
 {
+  "root": [],
   "alias": {},
   "file_extensions": [".js", ".coffee", ".jsx"],
-  "excluded_folders": ["node_modules", "dist", "build", "tmp", ".tmp"],
+  "excluded_folders": ["node_modules/", "dist/", "build/", "tmp/", ".tmp/"],
   "disable_dep_graph": false,
   "verbose_logging": true
 }

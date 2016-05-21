@@ -105,7 +105,8 @@ def file_filter(file_name):
 def folder_filter(folder_name):
     """Return True if the folder passes the filter."""
     excluded_folders = get_setting('excluded_folders', [])
-    return folder_name not in excluded_folders
+    folder_name = folder_name.rstrip(os.sep) + os.sep
+    return True not in [exc in folder_name for exc in excluded_folders]
 
 def expand_aliases(paths):
     "Replace all aliases in paths with the actual path"
@@ -119,11 +120,9 @@ def expand_aliases(paths):
 
     return paths
 
-def join_dep_paths(dir_path, paths):
-    "Join dir_path with each path and normalize it"
-    for i in range(len(paths)):
-        paths[i] = os.path.abspath(os.path.join(dir_path, paths[i]))
-    return paths
+def join_dep_path(dir_path, path):
+    "Join dir_path with path and normalize it"
+    return os.path.abspath(os.path.join(dir_path, path))
 
 def get_files_in_dir(path, recursive = True):
     "Return a list of all files in a directory (and its subdirectories if recursive = True)"
@@ -135,7 +134,7 @@ def get_files_in_dir(path, recursive = True):
             for f in files:
                 file_list.append(os.path.join(root, f))
     except FileNotFoundError as e:
-        log("File Not Found: %s Did you forget to add an alias?" % e.filename, warning=True)
+        pass
     return file_list
 
 def get_dep_cache_path(project_name):
@@ -195,44 +194,67 @@ def isdir(path):
         isdir_cache[path] = os.path.isdir(path)
     return isdir_cache[path]
 
-def resolve_dep_paths(paths, file_filter_fn = lambda x: True):
+def resolve_dep_paths(paths, from_path, file_filter_fn = lambda x: True, folder_filter_fn = lambda x: True):
     """
     Try to fix all paths that don't appear to point to actual files.
 
     Paths that point to a directory => expand to all files within the given directory
     Paths that point to a file but lack the extension => expand to files that start with the same basename
-    Paths that can't be resolved to anything => ignore dat shit (must be some lib import)
+    Paths that can't be resolved to anything => prepend each 'root' path and try again
+    Paths that still can't be resolved to anything => ignore dat shit (must be some lib import)
     """
     resolved_paths = []
 
     def add_path(path):
-        if not file_filter_fn(path): return
         resolved_paths.append(path)
 
-    for path in paths:
+    def expand_path(path):
+        """
+        Expand the path to what we find in the ...
+        return 2 bools: (found_file, passed_filter)
+        """
 
         # Add file path
-
         if isfile(path):
+            if not file_filter_fn(path): return (True, False)
+            if not folder_filter_fn(os.path.split(path)[0]): return (True, False)
             add_path(path)
-            continue
+            return (True, True)
 
         # Add files in dir
-
         if isdir(path):
-            for file_path in get_files_in_dir(path, False):
+            if not folder_filter_fn(path): return (True, False)
+            file_paths = [f for f in get_files_in_dir(path, False)]
+            file_paths_filtered = [f for f in file_paths if file_filter_fn(f)]
+            if not len(file_paths_filtered): return [len(file_paths) > 0, False]
+            for file_path in file_paths_filtered:
                 add_path(os.path.join(path, file_path))
-            continue
+            return (True, True)
 
         # Add matching filenames
-
         (parent_dir, file_substr) = os.path.split(path.rstrip(os.sep))
         all_files_in_dir = get_files_in_dir(parent_dir, False)
-        matching_files_in_dir = [f for f in all_files_in_dir if os.path.basename(f).startswith(file_substr) and file_filter_fn(f)]
+        if not folder_filter_fn(parent_dir): return (len(all_files_in_dir) > 0, False)
+        matching_files_in_dir = [f for f in all_files_in_dir if os.path.basename(f).startswith(file_substr)]
+        matching_files_filtered = [f for f in matching_files_in_dir if file_filter_fn(f)]
 
-        if matching_files_in_dir:
-            for path in matching_files_in_dir:
-                add_path(path)
-            continue
+        if not matching_files_filtered: return [len(matching_files_in_dir) > 0, False]
+        for path in matching_files_filtered:
+            add_path(path)
+        return (True, True)
+
+        return (False, False)
+
+    for path in paths:
+        roots = [from_path] + get_setting('root', [])
+        found_any_file = False
+        for root in roots:
+            (found_file, passed_filter) = expand_path(join_dep_path(root, path))
+            found_any_file = found_any_file or found_file
+            if found_file and passed_filter: break
+
+        # Warn when file was not found and the reason wasn't filtering
+        if not found_any_file:
+            log("Could not resolve import %s from %s %s. Did you forget to add an alias?" % (path, from_path, join_dep_path(from_path, path)), warning=True)
 
     return resolved_paths
