@@ -35,6 +35,11 @@ IGNORED_PREFIX = [
     'def',
     'class'
 ]
+IGNORED_BEFORE = [
+    'import',
+    'include',
+    'require'
+]
 IGNORED_SUFFIX = [
     ':',
     '='
@@ -105,6 +110,10 @@ def is_actual_usage(line, subject):
         before = line_split[0].rstrip(' \t ([{}])')
         for ignored_ending in IGNORED_PREFIX:
             if before.endswith(ignored_ending):
+                return False
+        # Filter out imports
+        for ignored_before in IGNORED_BEFORE:
+            if ignored_before in before:
                 return False
 
     if line_split[1]:
