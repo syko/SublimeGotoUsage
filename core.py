@@ -23,7 +23,7 @@ VAR_REGEX = {
 SINGLE_LINE_COMMENT = ['#', '//']
 MULTI_LINE_COMMENT_START = ['/*']
 MULTI_LINE_COMMENT_END = ['/*']
-SINGLE_LINE_IMPORT_RE = r'\b(import|require|include)\b.+[\'\"][^\'\"]+[\'\"]$'
+SINGLE_LINE_IMPORT_RE = r'\b(import|require|include)[^\[:.].*[\'\"][^\'\"]+[\'\"].*$'
 MULTI_LINE_IMPORT_START_RE = r'\b(import|require|include)\b[\s()\[\]{}]*$'
 MULTI_LINE_IMPORT_END_RE = r'^[)}\]](\s*from.+)?$'
 
@@ -227,9 +227,9 @@ def find_imports_in_file(f):
     Only supports imports that are between quotes and that are actual path strings.
     """
     deps = []
-    for (line_start, line_nr, line) in parse_lines(f, C_SINGLE_IMPORT | C_MULTI_IMPORT_END):
-        paths = re.search(r'[\'\"]([^\'\"]+)[\'\"]', line)
-        if paths: deps.append(paths.group(1))
+    for (line_start, line_nr, line) in parse_lines(f, C_SINGLE_IMPORT | C_MULTI_IMPORT | C_MULTI_IMPORT_END):
+        paths = re.findall(r'[\'\"]([^\'\"]+)[\'\"]', line)
+        if paths: deps.append(paths[-1])
     return deps
 
 def get_usages_in_file(file_path, subject):
