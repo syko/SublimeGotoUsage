@@ -51,7 +51,7 @@ class GotoUsageCommand(sublime_plugin.TextCommand):
             for project_folder in project_folders:
                 path = os.path.abspath(project_folder)
                 for usage in found_usage_list:
-                    usage['display_path'] = usage['path'].replace(path, '').strip('/\\')
+                    usage['display_path'] = "%s:%d" % (usage['path'].replace(path, '').strip('/\\'), usage['line_nr'])
 
             menu_list = [i['display_path'] for i in found_usage_list]
             window.show_quick_panel(menu_list, on_item_selected, 0, 0, on_item_highlighted)

@@ -126,11 +126,13 @@ def is_actual_usage(line, subject):
 
     return True
 
-def goto_usage_in_file(file_path, subject):
-    usage_region = None
+def get_usages_in_file(file_path, subject):
+    usage_regions = []
     point = 0
+    line_nr = 0
     with open(file_path, 'r', encoding='utf8') as f:
         for line in f:
+            line_nr += 1
             if subject not in line:
                 point += len(line)
                 continue
@@ -138,17 +140,14 @@ def goto_usage_in_file(file_path, subject):
                 point += len(line)
                 continue
             a = line.find(subject)
-            usage_region = sublime.Region(point + a, point + a + len(subject))
-            break
+            usage_regions.append({
+                'line_nr': line_nr,
+                'path': file_path,
+                'region': sublime.Region(point + a, point + a + len(subject))
+            })
+            point += len(line)
 
-    if usage_region:
-        return {
-            'name': os.path.basename(file_path),
-            'path': file_path,
-            'region': usage_region
-        }
-
-    return None
+    return usage_regions
 
 def find_imports_in_file(f):
     """
@@ -213,9 +212,8 @@ def goto_usage_in_files(subject, files):
 
     for file_path in files:
         try:
-            usage = goto_usage_in_file(file_path, subject)
-            if usage:
-                usage_list.append(usage)
+            usages = get_usages_in_file(file_path, subject)
+            usage_list.extend(usages)
         except UnicodeDecodeError:
             utils.log("Failed to open file", file_name, warning=True)
 
@@ -235,9 +233,8 @@ def goto_usage_in_folders(subject, folders):
             for file_name in files:
                 file_path = os.path.join(root, file_name)
                 try:
-                    usage = goto_usage_in_file(file_path, subject)
-                    if usage:
-                        usage_list.append(usage)
+                    usages = get_usages_in_file(file_path, subject)
+                    usage_list.extend(usages)
                 except UnicodeDecodeError:
                     utils.log("Failed to open file", file_name, warning=True)
 
