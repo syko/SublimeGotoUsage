@@ -88,10 +88,7 @@ def get_all_project_names():
 def get_setting(name, default = None):
     settings = sublime.load_settings('GotoUsage.sublime-settings')
     project_settings = settings.get(get_active_project_name(), {})
-    if project_settings:
-        return project_settings.get(name, default)
-    else:
-        return settings.get(name, default)
+    return project_settings.get(name, settings.get(name, default))
 
 def log(*args, **kwargs):
     error = kwargs.get('error', False)
@@ -101,13 +98,13 @@ def log(*args, **kwargs):
 
 def file_filter(file_name):
     """Return True if the file passes the filter."""
-    extensions = get_setting('file_extensions')
+    extensions = get_setting('file_extensions', [])
     if not extensions: return True
     return True in [file_name.endswith(ext) for ext in extensions]
 
 def folder_filter(folder_name):
     """Return True if the folder passes the filter."""
-    excluded_folders = get_setting('excluded_folders')
+    excluded_folders = get_setting('excluded_folders', [])
     return folder_name not in excluded_folders
 
 def expand_aliases(paths):
@@ -147,25 +144,40 @@ def get_dep_cache_path(project_name):
 def load_graph(project_name):
     """Load graph from cache to `graph`"""
     path = get_dep_cache_path(project_name)
+    log('Cache file for project %s:' % project_name, path)
     try:
-        f = open(path, 'r')
+        f = open(path, 'r', encoding='utf8')
         data = json.loads(f.read())
         f.close()
         graph = DepGraph()
-        graph.set_data(data)
-        return graph
+        graph.set_data(data['graph'])
+        return {
+            'last_update': data['last_update'],
+            'graph': graph
+        }
     except IOError:
         return None
 
-def save_graph(graph, project_name):
+def save_graph(g, project_name):
     """Save current graph to cache"""
     path = get_dep_cache_path(project_name)
     try:
         f = open(path, 'w')
-        f.write(json.dumps(graph.get_data(), separators=(',',':')))
+        data = {
+            'last_update': g['last_update'],
+            'graph': g['graph'].get_data()
+        }
+        f.write(json.dumps(data, separators=(',',':')))
         f.close()
     except IOError as e:
         log("Failed to save dependency graph: %s" % e.message, error=True)
+
+def clear_caches():
+    files = get_files_in_dir(sublime.cache_path())
+    for file_path in files:
+        (parent_dir, file_name) = os.path.split(file_path)
+        if file_name.startswith('GotoUsage-cache'):
+            os.remove(file_path)
 
 isfile_cache = {}
 def isfile(path):

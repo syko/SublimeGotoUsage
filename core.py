@@ -1,7 +1,6 @@
 import os
 import re
 import time
-import codecs
 import sublime
 from . import utils
 from .dep_graph import DepGraph
@@ -126,7 +125,7 @@ def is_actual_usage(line, subject):
 def goto_usage_in_file(file_path, subject):
     usage_region = None
     point = 0
-    with codecs.open(file_path, 'r', 'utf8') as f:
+    with open(file_path, 'r', encoding='utf8') as f:
         for line in f:
             if subject not in line:
                 point += len(line)
@@ -242,7 +241,7 @@ def goto_usage_in_folders(subject, folders):
 
 def get_dependencies_in_file(file_path):
     try:
-        with codecs.open(file_path, 'r', 'utf8') as f:
+        with open(file_path, 'r', encoding='utf8') as f:
             deps = find_imports_in_file(f)
             utils.expand_aliases(deps)
             dir_path = os.path.dirname(file_path)
@@ -253,7 +252,7 @@ def get_dependencies_in_file(file_path):
     except UnicodeDecodeError:
         utils.log("Failed to open file", file_path, warning=True)
 
-def build_graph(graph_to_build, folders, **kwargs):
+def build_graph(g_to_build, folders, **kwargs):
     """Build a whole new dependency graph"""
     import random
     for folder in folders:
@@ -262,10 +261,10 @@ def build_graph(graph_to_build, folders, **kwargs):
             dirs[:] = [d for d in dirs if d[0] != '.' and utils.folder_filter(d)]
             for file_name in files:
                 file_path = os.path.join(root, file_name)
-                if kwargs.get('on_progress', None): kwargs.get('on_progress')(num_deps)
                 deps = get_dependencies_in_file(file_path)
-                graph_to_build.add(file_path, deps)
+                g_to_build['graph'].add(file_path, deps)
 
+    g_to_build['last_update'] = time.time()
     if kwargs.get('on_complete'): kwargs.get('on_complete')()
 
 def refresh_dependencies(file_path, project_name):
@@ -274,37 +273,41 @@ def refresh_dependencies(file_path, project_name):
     to the cache if the deps have changed.
     """
     global graphs
-    graph = graphs.get(project_name)
+    g = graphs.get(project_name, {})
 
-    if not graph:
-        utils.log('Cannot refresh dependencies for file "%s", graph for project "%s" does not exist: rebuilding' % (file_path, project_name))
-        sublime.active_window().run_command('goto_usage_build_graph', {'project_name': project_name})
+    if not g:
+        utils.log('Cannot refresh dependencies for file "%s", graph for project "%s" does not exist: loading graph' % (file_path, project_name))
+        load_graph(project_name)
         return
 
     direct_deps = get_dependencies_in_file(file_path)
-    current_deps = graph.get_dependees(file_path)
-    graph.set(file_path, direct_deps)
+    current_deps = g['graph'].get_dependees(file_path)
+    g['graph'].set(file_path, direct_deps)
+    g['last_update'] = time.time()
 
     # Update cache if graph changed
-    if graph.get_dependees(file_path) != current_deps:
-        utils.save_graph(graph)
+    if g['graph'].get_dependees(file_path) != current_deps:
+        utils.save_graph(g)
 
 def load_graph(project_name):
     global graphs
     utils.log("Loading graph from cache for project %s" % project_name)
-    graph = utils.load_graph(project_name)
-    if not graph or graph.num_deps == 0:
-        utils.log("No graph in cache: rebuilding")
+    g = utils.load_graph(project_name)
+    if not g or g['graph'].num_deps == 0:
+        utils.log("No graph in cache for %s: rebuilding" % project_name)
         sublime.active_window().run_command('goto_usage_build_graph', {'project_name': project_name})
     else:
-        utils.log("Got %d dependencies from cache" % graph.num_deps)
+        utils.log("Got %d dependencies from cache for %s" % (g['graph'].num_deps, project_name))
+        if g['last_update'] < time.time() - 1000 * 60 * 60 * 24:
+            utils.log("Graph older than 24h, rebuilding")
+            sublime.active_window().run_command('goto_usage_build_graph', {'project_name': project_name})
+        else:
+            graphs[project_name] = g
 
 def ensure_graph_exists(project_name):
     global graphs
-    print('ensuring')
-    graph = graphs.get(project_name)
-    if not graph or graph['last_update'] < time.time() - 1000 * 60 * 60 * 24:
-        print('no graph, making')
+    g = graphs.get(project_name)
+    if not g:
         load_graph(project_name)
 
 def load_all_graphs():

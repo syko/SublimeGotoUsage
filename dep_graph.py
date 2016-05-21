@@ -70,6 +70,7 @@ class DepGraph:
     def set_data(self, data):
         self.forward_graph = data.get('forward', {})
         self.backward_graph = data.get('backward', {})
+        self.num_deps = len([dep for deps in self.forward_graph.values() for dep in deps])
 
     def _traverse_graph(self, graph, subject):
         results = []

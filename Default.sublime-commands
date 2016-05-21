@@ -1,4 +1,5 @@
 [
     { "caption": "Goto Usage", "command": "goto_usage", "args" : {} },
-    { "caption": "Goto Usage: Rebuild dependency graph", "command": "goto_usage_build_graph", "args" : {} }
+    { "caption": "Goto Usage: Rebuild dependency graph", "command": "goto_usage_build_graph", "args" : {} },
+    { "caption": "Goto Usage: Clear dependency graphs", "command": "goto_usage_clear_caches", "args" : {} }
 ]
