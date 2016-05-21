@@ -101,7 +101,7 @@ def find_subject_name_upwards(view, regex):
         return get_item_name_on_line(view.substr(region), regex)
 
     # Cursor is before any class definitions... return the first one
-    return get_item_name(view.substr(regions[0]))
+    return get_item_name_on_line(view.substr(regions[0]), regex)
 
 def find_subject_name(view):
     """
@@ -168,7 +168,7 @@ def parse_lines(f, yield_context=C_ANY):
         if not current_context[-1] & C_MULTI_COMMENT:
             is_single_line_comment = True in (line.startswith(c) for c in SINGLE_LINE_COMMENT)
             if is_single_line_comment:
-                if yield_context & C_COMMENT: yield (line_start, line_nr, line)
+                if yield_context & C_COMMENT: yield (line_start, line_nr, line_unstripped)
                 line_start += len(line_unstripped)
                 continue
 
@@ -176,7 +176,7 @@ def parse_lines(f, yield_context=C_ANY):
         if current_context[-1] & C_MULTI_COMMENT:
             is_comment_end = True in (line.startswith(c) for c in MULTI_LINE_COMMENT_END)
             if is_comment_end:
-                if yield_context & C_MULTI_COMMENT_END: yield (line_start, line_nr, line)
+                if yield_context & C_MULTI_COMMENT_END: yield (line_start, line_nr, line_unstripped)
                 line_start += len(line_unstripped)
                 current_context.pop()
                 continue # Kinda assuming nothing comes after `*/` here
@@ -186,7 +186,7 @@ def parse_lines(f, yield_context=C_ANY):
             is_comment_start = True in (line.startswith(c) for c in MULTI_LINE_COMMENT_START)
             if is_comment_start:
                 current_context.append(C_MULTI_COMMENT)
-                if yield_context & C_MULTI_COMMENT_START: yield (line_start, line_nr, line)
+                if yield_context & C_MULTI_COMMENT_START: yield (line_start, line_nr, line_unstripped)
                 line_start += len(line_unstripped)
                 continue
 
@@ -194,7 +194,7 @@ def parse_lines(f, yield_context=C_ANY):
         if not current_context[-1] & C_MULTI_IMPORT:
             is_single_line_import = re.search(SINGLE_LINE_IMPORT_RE, line)
             if is_single_line_import:
-                if yield_context & C_SINGLE_IMPORT: yield (line_start, line_nr, line)
+                if yield_context & C_SINGLE_IMPORT: yield (line_start, line_nr, line_unstripped)
                 line_start += len(line_unstripped)
                 continue
 
@@ -202,7 +202,7 @@ def parse_lines(f, yield_context=C_ANY):
         if current_context[-1] & C_MULTI_IMPORT:
             is_import_end = re.search(MULTI_LINE_IMPORT_END_RE, line)
             if is_import_end:
-                if yield_context & C_MULTI_IMPORT_END: yield (line_start, line_nr, line)
+                if yield_context & C_MULTI_IMPORT_END: yield (line_start, line_nr, line_unstripped)
                 current_context.pop()
                 line_start += len(line_unstripped)
                 continue
@@ -212,15 +212,17 @@ def parse_lines(f, yield_context=C_ANY):
             is_import_start = re.search(MULTI_LINE_IMPORT_START_RE, line)
             if is_import_start:
                 current_context.append(C_MULTI_IMPORT)
-                if yield_context & C_MULTI_IMPORT_START: yield (line_start, line_nr, line)
+                if yield_context & C_MULTI_IMPORT_START: yield (line_start, line_nr, line_unstripped)
                 line_start += len(line_unstripped)
                 continue
 
         # No context switch detected: yield current context for current line
 
         if yield_context & current_context[-1]:
-            yield (line_start, line_nr, line)
-            line_start += len(line_unstripped)
+            yield (line_start, line_nr, line_unstripped)
+
+        line_start += len(line_unstripped)
+
 def find_imports_in_file(f):
     """
     Uses some broad keywords and quotation-searching to find imports.
