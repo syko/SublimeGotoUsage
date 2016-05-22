@@ -12,7 +12,7 @@ def infinite(max_iterations = 200):
     while i < max_iterations:
         yield True
         i += 1
-    raise Exception("Infinite loop protection kicked in (i=%d). Fix your crappy loop!" % i)
+    raise Exception("Infinite loop protection kicked in (i=%d). Something's buggy" % i)
 
 def get_current_line(view):
     "Returns the first highlighted line region and line contents"
@@ -143,7 +143,7 @@ def get_dep_cache_path(project_name):
 def load_graph(project_name):
     """Load graph from cache to `graph`"""
     path = get_dep_cache_path(project_name)
-    log('Cache file for project %s:' % project_name, path)
+    log("Attempting to load graph for '%s' from %s" % (project_name, path))
     try:
         f = open(path, 'r', encoding='utf8')
         data = json.loads(f.read())
@@ -160,6 +160,7 @@ def load_graph(project_name):
 def save_graph(g, project_name):
     """Save current graph to cache"""
     path = get_dep_cache_path(project_name)
+    log("Saving graph for '%s' to cache: %s" % (project_name, path))
     try:
         f = open(path, 'w')
         data = {
@@ -176,6 +177,7 @@ def clear_caches():
     for file_path in files:
         (parent_dir, file_name) = os.path.split(file_path)
         if file_name.startswith('GotoUsage-cache'):
+            log("Removing cache file %s" file_path)
             os.remove(file_path)
 
 isfile_cache = {}
@@ -210,7 +212,7 @@ def resolve_dep_paths(paths, from_path, file_filter_fn = lambda x: True, folder_
 
     def expand_path(path):
         """
-        Expand the path to what we find in the ...
+        Expand the absolute path `path`
         return 2 bools: (found_file, passed_filter)
         """
 
@@ -249,12 +251,15 @@ def resolve_dep_paths(paths, from_path, file_filter_fn = lambda x: True, folder_
         roots = [from_path] + get_setting('root', [])
         found_any_file = False
         for root in roots:
-            (found_file, passed_filter) = expand_path(join_dep_path(root, path))
+            full_path = join_dep_path(root, path)
+            (found_file, passed_filter) = expand_path(full_path)
+            if found_file:
+                log("Found a dependency for path but ignoring due to file and folder filters: '%s'" % full_path)
             found_any_file = found_any_file or found_file
             if found_file and passed_filter: break
 
         # Warn when file was not found and the reason wasn't filtering
         if not found_any_file:
-            log("Could not resolve import %s from %s %s. Did you forget to add an alias?" % (path, from_path, join_dep_path(from_path, path)), warning=True)
+            log("Could not resolve import %s. Did you forget to add an alias? (import from %s)" % (path, from_path), warning=True)
 
     return resolved_paths
