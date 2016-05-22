@@ -378,4 +378,4 @@ def show_usage(view, usage, select):
     sel = view.sel()
     sel.clear()
     sel.add(select and usage['region'] or usage['region'].a)
-    sublime.set_timeout(lambda: view.show(usage['region']), 100)
+    sublime.set_timeout(lambda: view.show_at_center(usage['region']), 100)
