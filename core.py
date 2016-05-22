@@ -369,13 +369,13 @@ def open_usage(view, usage, is_transient = False):
     if view.is_loading():
         open_callbacks.append({
             'view': view,
-            'callback': lambda view, cb: show_usage(view, usage)
+            'callback': lambda view, cb: show_usage(view, usage, is_transient)
         })
     else:
-        show_usage(view, usage)
+        show_usage(view, usage, is_transient)
 
-def show_usage(view, usage):
+def show_usage(view, usage, select):
     sel = view.sel()
     sel.clear()
-    sel.add(usage['region'])
+    sel.add(select and usage['region'] or usage['region'].a)
     sublime.set_timeout(lambda: view.show(usage['region']), 100)
