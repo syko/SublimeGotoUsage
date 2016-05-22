@@ -320,7 +320,7 @@ def refresh_dependencies(file_path, project_name):
     global graphs
     g = graphs.get(project_name, {})
 
-    utils.log("Refreshing deps for file" % file_path)
+    utils.log("Refreshing deps for file", file_path)
 
     if not g:
         utils.log('Cannot refresh dependencies for file "%s", graph for project "%s" does not exist: loading graph' % (file_path, project_name))

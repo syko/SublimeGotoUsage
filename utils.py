@@ -177,7 +177,7 @@ def clear_caches():
     for file_path in files:
         (parent_dir, file_name) = os.path.split(file_path)
         if file_name.startswith('GotoUsage-cache'):
-            log("Removing cache file %s" file_path)
+            log("Removing cache file %s" % file_path)
             os.remove(file_path)
 
 isfile_cache = {}
