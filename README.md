@@ -2,10 +2,13 @@
 
 The opposite of Goto Definition.
 
-With the cursor in a class definition, invoke Goto Usage and get a list of all the places where the class is used.
+With the cursor on a class/function/variable definition, invoke Goto Usage and get a list of all the places where the class is used.
 You can easily browse through the list and jump to the specific use case.
 
 Default keyboard mapping: `cmd+alt+o` / `ctrl+alt+o`
+
+Note that if there is no definition on the current line, it will search upwards from the current line so essentially you
+can simply be looking at the body of a class and it'll still work.
 
 ## Installing
 
@@ -13,7 +16,7 @@ Clone this repository into your Sublime Packages directory (Package Control supp
 
 ## Usage
 
-Simply press `cmd+alt+o` (`ctrl+alt+o`) when looking at a class definition.
+Simply press `cmd+alt+o` (`ctrl+alt+o`) with the cursor in a class/function/var definition.
 
 You can also run these commands manually:
 - `Goto Usage`
