@@ -253,7 +253,7 @@ def resolve_dep_paths(paths, from_path, file_filter_fn = lambda x: True, folder_
         for root in roots:
             full_path = join_dep_path(root, path)
             (found_file, passed_filter) = expand_path(full_path)
-            if found_file:
+            if found_file and not passed_filter:
                 log("Found a dependency for path but ignoring due to file and folder filters: '%s'" % full_path)
             found_any_file = found_any_file or found_file
             if found_file and passed_filter: break
