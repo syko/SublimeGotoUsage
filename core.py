@@ -378,4 +378,13 @@ def show_usage(view, usage, select):
     sel = view.sel()
     sel.clear()
     sel.add(select and usage['region'] or usage['region'].a)
+    refresh_selections(view)
     sublime.set_timeout(lambda: view.show_at_center(usage['region']), 100)
+
+def refresh_selections(view):
+    """
+    Workaround for bug #485 where the view is not repainted
+    See https://github.com/SublimeTextIssues/Core/issues/485
+    """
+    view.add_regions('gotousage_485fix', [], "no_scope", "", sublime.HIDDEN)
+    view.erase_regions('gotousage_485fix')
