@@ -262,6 +262,10 @@ def get_usages_in_files(subject, files):
             usage_list.extend(usages)
         except UnicodeDecodeError:
             utils.log("Failed to open file", file_name, warning=True)
+        except FileNotFoundError:
+            utils.log("File not found", file_name, warning=True)
+            utils.log("Probably the file has been (re)moved and the dependency graph is stale. Please rebuild!", warning=True)
+            sublime.active_window().status_message("GotoUsage Error! Dependency graph looks out of date. Please rebuild!")
 
     return usage_list
 
@@ -283,6 +287,9 @@ def get_usages_in_folders(subject, folders):
                     usage_list.extend(usages)
                 except UnicodeDecodeError:
                     utils.log("Failed to open file", file_name, warning=True)
+                except FileNotFoundError:
+                    utils.log("File not found", file_name, warning=True)
+                    utils.log("Probably the file has been (re)moved and the dependency graph is stale. Please rebuild!", warning=True)
 
     return usage_list
 

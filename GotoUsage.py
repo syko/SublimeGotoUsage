@@ -33,12 +33,12 @@ class GotoUsageCommand(sublime_plugin.TextCommand):
         subject = core.find_subject_name(self.view)
 
         if not subject:
-            sublime.status_message("Could not find class/function name to search for")
+            sublime.status_message("GotoUsage: Could not find class/function name to search for")
             return
 
         def on_complete(found_usage_list):
             if not len(found_usage_list):
-                sublime.status_message("Could not find class/function/var '%s'" % subject)
+                sublime.status_message("GotoUsage: Could not find class/function/var '%s'" % subject)
                 return
 
             def on_item_selected(index):
