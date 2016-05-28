@@ -18,6 +18,7 @@ Simply press `cmd+alt+o` (`ctrl+alt+o`) when looking at a class definition.
 You can also run these commands manually:
 - `Goto Usage`
 - `Goto Usage: Rebuild Dependency Graph`
+- `Goto Usage: Clear dependency graphs`
 
 By default Goto Usage builds a dependency graph of the current project and only traverses upstream files when looking
 for "usages". Usages are matched by name (does not work with renamed imports!)
@@ -40,6 +41,7 @@ can be a time-intensive operation (based on how large your project is) so it's *
 - `Goto Usage: Rebuild Dependency Graph`: Fully rebuild the dependency graph of the current project. Dependency graph is
   built once and then cached & updated on each file save so it should keep itself up to date unless you add/edit files outside
   Sublime Text. This is where this command may come in handy.
+- `Goto Usage: Clear dependency graphs`: Clears all dependency graphs and caches
 
 ## Configuration
 
