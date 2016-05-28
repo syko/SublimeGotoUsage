@@ -84,7 +84,7 @@ it's a good idea to disable the dependency graph globally and only enable it for
 
 ```json
 {
-  "disable_dep_graph": true
+  "disable_dep_graph": true,
   "my_project": {
     "disable_dep_graph": false
   }
