@@ -12,7 +12,7 @@ CLASS_REGEX = {
     'group': [1]
 }
 FUNCTION_REGEX = {
-    'regex': r'(function\s+([^\s\(\)\[\]\{\}+*/&\|=<>,:;~-]+)+.+{$)|(def\s([^\s\(\)\[\]\{\}+*/&\|=<>,:;~-]+).+:$)',
+    'regex': r'(function\s+([^\s\(\)\[\]\{\}+*/&\|=<>,:;~-]+).+{$)|(def\s([^\s\(\)\[\]\{\}+*/&\|=<>,:;~-]+).+:$)',
     'group': [2, 4]
 }
 VAR_REGEX = {
@@ -72,7 +72,7 @@ LOADING_FRAMES = [
 ]
 
 def get_item_name_on_line(line, regex):
-    matches = re.match(regex['regex'], line)
+    matches = re.search(regex['regex'], line)
     if not matches: return None
     if matches:
         return [matches.group(i) for i in regex['group'] if matches.group(i)][0]
