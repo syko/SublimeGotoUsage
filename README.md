@@ -12,7 +12,7 @@ can simply be looking at the body of a class and it'll still work.
 
 ## Installing
 
-Clone this repository into your Sublime Packages directory (Package Control support coming soon).
+Open up Package Control and look for 'Goto Usage'
 
 ## Usage
 
