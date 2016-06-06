@@ -87,7 +87,7 @@ def get_all_project_names():
 
 def get_setting(name, default = None):
     settings = sublime.load_settings('GotoUsage.sublime-settings')
-    project_settings = settings.get(get_active_project_name(), {})
+    project_settings = settings.get(get_active_project_name() or 'no_project', {})
     return project_settings.get(name, settings.get(name, default))
 
 def log(*args, **kwargs):
