@@ -134,10 +134,10 @@ def is_actual_usage(line, subject):
 
     if line_split[1]:
         # Test for word-break after subject
-        if re.match(r'[^\s()\[\]{},+*/%!;:\'\"=<>-]', line_split[1][0]):
+        if re.match(r'[^\s()\[\]{},\.+*/%!;:\'\"=<>-]', line_split[1][0]):
             return False
         # Test for definitions
-        after = line_split[1].rstrip(' \t ([{}])')
+        after = line_split[1].lstrip(' \t ')
         for ignored_beginning in IGNORED_SUFFIX:
             if after.startswith(ignored_beginning):
                 return False
