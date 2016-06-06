@@ -341,7 +341,7 @@ def refresh_dependencies(file_path, project_name):
 
     # Update cache if graph changed
     if g['graph'].get_dependees(file_path) != current_deps:
-        utils.save_graph(g)
+        utils.save_graph(g, project_name)
 
 def load_graph(project_name):
     """Attempt to load a graph from cache. If none is found attempt to build it"""
