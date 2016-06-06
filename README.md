@@ -105,4 +105,4 @@ The dependency graph tries to remove false negatives as much as possible so:
 
 ## Contributing
 
-Issues are welcome, so a PRs.
+Issues are welcome, so are PRs.
