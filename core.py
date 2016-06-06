@@ -22,7 +22,7 @@ VAR_REGEX = {
 
 SINGLE_LINE_COMMENT = ['#', '//']
 MULTI_LINE_COMMENT_START = ['/*']
-MULTI_LINE_COMMENT_END = ['/*']
+MULTI_LINE_COMMENT_END = ['*/']
 SINGLE_LINE_IMPORT_RE = r'\b(import|require|include)[^\[:.].*[\'\"][^\'\"]+[\'\"].*$'
 MULTI_LINE_IMPORT_START_RE = r'\b(import|require|include)\b[\s()\[\]{}]*$'
 MULTI_LINE_IMPORT_END_RE = r'^[)}\]](\s*from.+)?$'
@@ -167,14 +167,16 @@ def parse_lines(f, yield_context=C_ANY):
         # Handle single-line comments
         if not current_context[-1] & C_MULTI_COMMENT:
             is_single_line_comment = True in (line.startswith(c) for c in SINGLE_LINE_COMMENT)
-            if is_single_line_comment:
+            is_single_multi = True in (c in line for c in MULTI_LINE_COMMENT_START) and \
+                True in (c in line for c in MULTI_LINE_COMMENT_END)
+            if is_single_line_comment or is_single_multi:
                 if yield_context & C_COMMENT: yield (line_start, line_nr, line_unstripped)
                 line_start += len(line_unstripped)
                 continue
 
         # Handle end of multi-line comment
         if current_context[-1] & C_MULTI_COMMENT:
-            is_comment_end = True in (line.startswith(c) for c in MULTI_LINE_COMMENT_END)
+            is_comment_end = True in (c in line for c in MULTI_LINE_COMMENT_END)
             if is_comment_end:
                 if yield_context & C_MULTI_COMMENT_END: yield (line_start, line_nr, line_unstripped)
                 line_start += len(line_unstripped)
@@ -183,7 +185,7 @@ def parse_lines(f, yield_context=C_ANY):
 
         # Handle start of multi-line comment
         if not current_context[-1] & C_MULTI_COMMENT:
-            is_comment_start = True in (line.startswith(c) for c in MULTI_LINE_COMMENT_START)
+            is_comment_start = True in (c in line for c in MULTI_LINE_COMMENT_START)
             if is_comment_start:
                 current_context.append(C_MULTI_COMMENT)
                 if yield_context & C_MULTI_COMMENT_START: yield (line_start, line_nr, line_unstripped)
@@ -191,7 +193,8 @@ def parse_lines(f, yield_context=C_ANY):
                 continue
 
         # Handle single-line import
-        if not current_context[-1] & C_MULTI_IMPORT:
+        if not current_context[-1] & C_MULTI_IMPORT and \
+            not current_context[-1] & C_MULTI_COMMENT:
             is_single_line_import = re.search(SINGLE_LINE_IMPORT_RE, line)
             if is_single_line_import:
                 if yield_context & C_SINGLE_IMPORT: yield (line_start, line_nr, line_unstripped)
@@ -199,7 +202,8 @@ def parse_lines(f, yield_context=C_ANY):
                 continue
 
         # Handle end of import
-        if current_context[-1] & C_MULTI_IMPORT:
+        if current_context[-1] & C_MULTI_IMPORT and \
+            not current_context[-1] & C_MULTI_COMMENT:
             is_import_end = re.search(MULTI_LINE_IMPORT_END_RE, line)
             if is_import_end:
                 if yield_context & C_MULTI_IMPORT_END: yield (line_start, line_nr, line_unstripped)
@@ -208,7 +212,8 @@ def parse_lines(f, yield_context=C_ANY):
                 continue
 
         # Handle start of multi-line import
-        if not current_context[-1] & C_MULTI_IMPORT:
+        if not current_context[-1] & C_MULTI_IMPORT and \
+            not current_context[-1] & C_MULTI_COMMENT:
             is_import_start = re.search(MULTI_LINE_IMPORT_START_RE, line)
             if is_import_start:
                 current_context.append(C_MULTI_IMPORT)
