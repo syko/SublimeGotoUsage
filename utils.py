@@ -137,8 +137,14 @@ def get_files_in_dir(path, recursive = True):
         pass
     return file_list
 
+def get_cache_dir():
+    path = os.path.join(sublime.cache_path(), 'GotoUsage')
+    if not os.path.exists(path):
+        os.mkdir(path)
+    return path
+
 def get_dep_cache_path(project_name):
-    return os.path.join(sublime.cache_path(), 'GotoUsage-cache-%s.json' % project_name)
+    return os.path.join(get_cache_dir(), '%s-cache.json' % project_name)
 
 def load_graph(project_name):
     """Load graph from cache to `graph`"""
@@ -173,12 +179,11 @@ def save_graph(g, project_name):
         log("Failed to save dependency graph: %s" % e.message, error=True)
 
 def clear_caches():
-    files = get_files_in_dir(sublime.cache_path())
+    files = get_files_in_dir(get_cache_dir())
     for file_path in files:
         (parent_dir, file_name) = os.path.split(file_path)
-        if file_name.startswith('GotoUsage-cache'):
-            log("Removing cache file %s" % file_path)
-            os.remove(file_path)
+        log("Removing cache file %s" % file_path)
+        os.remove(file_path)
 
 isfile_cache = {}
 def isfile(path):
