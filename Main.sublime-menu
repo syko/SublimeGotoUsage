@@ -1,5 +1,38 @@
 [
     {
+        "caption": "Goto",
+        "id": "goto",
+        "children":
+        [
+            {
+                "caption": "Goto Usage",
+                "command": "goto_usage"
+            }
+        ]
+    },
+    {
+        "caption": "Tools",
+        "id": "tools",
+        "children":
+        [
+            {
+                "caption": "Usage",
+                "mnemonic": "U",
+                "children":
+                [
+                    {
+                        "caption": "Rebuild dependency graph",
+                        "command": "goto_usage_build_graph"
+                    },
+                    {
+                        "caption": "Clear dependency graphs",
+                        "command": "goto_usage_clear_caches"
+                    }
+                ]
+            }
+        ]
+    },
+    {
         "caption": "Preferences",
         "mnemonic": "n",
         "id": "preferences",
